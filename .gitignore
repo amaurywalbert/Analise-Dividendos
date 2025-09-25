@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.env
+*.sqlite
+*.db
+
+# Node.js
+node_modules/
+dist/
+
+# Dados
+*.csv
+*.xlsx
+*.json
+
+# Sistema
+.DS_Store
+Thumbs.db
