@@ -1,0 +1,82 @@
+O sistema é sobre como e a hora de escolher investir em uma empresa com foco na sua distribuição de dividendos.
+
+Seguem Algumas restrições que podem responder suas questões:
+
+1. Quero poder inserir informações quantitativas e qualitativas das empresas como:
+
+Quantitativos:
+
+a. número total de ações que formam o capital social;
+
+b. valor líquido de dividendos pagos por ação (anual);
+
+c. lucro líquido por trimestre;
+
+d. Payout projetado para o ano;
+
+e. ajuste nos dividendos projetados (alguma bonificação prevista, ou item não recorrente que impacte o dividendo projetado)
+
+f. o preço atual de mercado, que pode ser inserido manualmente ou buscado de uma api como Yahoo Finance, por exemplo.
+
+Qualitativos:
+
+a. Informação sobre o motivo do ajuste nos divendos projetados, Tipo de análise para projeção dos dividendos, isto é, se sobre o lucro líquido, ou sobre o lucro regulatório ou sobre fluxo de caixa livre, ou sobre EBTIDA, etc.
+
+b. 5 vantagens sobre a empresa e sua distribuição de dividendos
+
+c. 5 desvantagens sobre a empresa e sua distribuição de dividendos
+
+
+
+Com essas informações inseridas, o sistema deve calcular o dividendo projetado e a margem em relação ao preço de tela, com um parâmetro de ajuste que é o yield mínimo (por exemplo, 8%), para mostrar o preço teto que eu posso pagar para garantir esse yield mínimo.
+
+
+
+Detalhando o que o sistema deve calcular:
+
+ - Lucro por ação do ano anterior = lucro líquido do ano anterior dividido pelo número de ações da empresa.
+
+- Payout do ano anterior = dividendo líquido pago por ação dividido pelo lucro por ação do ano anterior.
+
+Lucro líquido anual = soma dos lucros líquidos trimestrais
+
+- CAGR do lucro líquido dos últimos 5 anos. Se não tiver os dados inseridos sobre o lucro líquido dos últimos 5 anos, pedir para o usuário informar esse CAGR manualmente.
+
+ - Variação Trimestre a trimestre do lucro líquido em relação ao ano anterior, em porcentagem.
+
+ - Lucro por ação estimado para o ano (LPAe) = lucro por ação do ano anterior multiplicado pelo CAGR dos últimos 5 anos e multiplicado a variação trimestre a trimestre do lucro líquido.
+
+ - Dividendo projetado: Lucro por ação estimado para o ano multiplicado pelo Payout projetado e multiplicado pelo ajuste nos dividendos projetados.
+
+ - Preço Teto: Dividendo projetado dividido pelo Yield mínimo informado pelo usuário como parâmetro.
+
+ - Margem: Diferença percentual entre o preço teto e o preço atual da ação.
+
+
+2. Respondida junto com a primeira resposta.
+
+3. Os dados financeiros das empresas são atualizados trimestralmente, de acordo com a divulgação dos resultados trimestrais. O preço atual da ação deve ser atualizado diariamente ou a qualquer momento solicitado pelo usuário, com entrada manual ou a partir de uma api como a do Yahoo Finance, por exemplo. 
+
+4. Atualmente não há integração com outra fonte de dados.
+
+
+5. Inicialmente é apenas um usuário, mas seria interessante ter um admin que controla tudo, e um usuário padrão que apenas insere os dados trimestrais e preço atual da ação.
+
+6. Quero receber Notificação quando o preço atual estiver o mais longe historicamente do preço teto.
+
+7. Sim, é importante manter um histórico dos dados.
+
+8. Por enquanto só ações.
+
+
+De acordo com minhas restrições, analise se os meus cálculos estão corretos de acordo com a literatura ou sobre outras formas de se calcular o preço teto máximo para investir em uma ação com base na sua distribuição de dividendos.
+
+Faça o plano de desenvolvimento detalhado.
+
+Quero que utilize python!
+
+Prepare o sistema para que seja hospedado posteriormente em um Virtual private server (VPS) que vou alugar. 
+
+Além de seu cliente, quero que me ajude a entender todas as etapas, tanto de projeto quanto de instalação das ferramentas, até a codificação. Quero ser também seu aluno de desenvolvimento web.
+
+Se precisar de mais alguma informação para o desenvolvimento do sistema, me pergunte.

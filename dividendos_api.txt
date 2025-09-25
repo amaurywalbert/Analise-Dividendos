@@ -1,0 +1,732 @@
+--------------------------------------------------------------------------------------------------------------
+# ----------------------------
+# dividendos_api/app/database.py
+# ----------------------------
+# cria a conexão com PostgreSQL via .env com log de conexão
+
+# app/database.py
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Verifica se a variável de ambiente DATABASE_URL está definida
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL não encontrada. Verifique o arquivo .env")
+
+# Cria a engine de conexão com o banco de dados
+engine = create_engine(DATABASE_URL, echo=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+--------------------------------------------------------------------------------------------------------------
+
+
+# ----------------------------
+# dividendos_api/app/models.py
+# ----------------------------
+from sqlalchemy import BigInteger, Column, Integer, String, Float, ForeignKey
+from sqlalchemy.orm import relationship
+from .database import Base
+
+class Empresa(Base):
+    __tablename__ = "empresas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, unique=True, index=True)
+    ticker = Column(String, unique=True, index=True)
+    numero_acoes = Column(BigInteger)
+    dados = relationship("DadoFinanceiro", back_populates="empresa")
+
+
+class DadoFinanceiro(Base):
+    __tablename__ = "dados_financeiros"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ano = Column(Integer)
+    empresa_id = Column(Integer, ForeignKey("empresas.id"))
+
+    lucro_t1 = Column(Float)
+    lucro_t2 = Column(Float)
+    lucro_t3 = Column(Float)
+    lucro_t4 = Column(Float)
+    dividendo_por_acao = Column(Float)
+    payout_projetado = Column(Float)
+    ajuste_dividendo = Column(Float)
+    preco_atual = Column(Float)
+    cagr = Column(Float, nullable=True)
+
+    tipo_analise = Column(String, nullable=True)
+    ajuste_motivo = Column(String, nullable=True)
+    vantagens = Column(String, nullable=True)
+    desvantagens = Column(String, nullable=True)
+
+    lucro_liquido_anual = Column(Float, nullable=True)
+    lpa_estimada = Column(Float, nullable=True)
+    dividendo_projetado_calc = Column(Float, nullable=True)
+    preco_teto = Column(Float, nullable=True)
+    margem = Column(Float, nullable=True)
+
+    empresa = relationship("Empresa", back_populates="dados")
+
+
+--------------------------------------------------------------------------------------------------------------
+
+
+# ----------------------------
+# dividendos_api/app/schemas.py
+# ----------------------------
+from pydantic import BaseModel
+from typing import Optional
+
+class EmpresaBase(BaseModel):
+    nome: str
+    ticker: str
+    numero_acoes: int
+
+class EmpresaCreate(EmpresaBase):
+    pass
+
+
+class EmpresaUpdate(BaseModel):
+    nome: Optional[str] = None
+    ticker: Optional[str] = None
+    numero_acoes: Optional[int] = None
+
+class EmpresaOut(EmpresaBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+class DadoFinanceiroBase(BaseModel):
+    ano: int
+    lucro_t1: float
+    lucro_t2: float
+    lucro_t3: float
+    lucro_t4: float
+    dividendo_por_acao: float
+    payout_projetado: float
+    ajuste_dividendo: float
+    preco_atual: float
+    cagr: Optional[float] = None
+    tipo_analise: Optional[str] = None
+    ajuste_motivo: Optional[str] = None
+    vantagens: Optional[str] = None
+    desvantagens: Optional[str] = None
+
+class DadoFinanceiroCreate(DadoFinanceiroBase):
+    empresa_id: int
+
+class DadoFinanceiroOut(DadoFinanceiroBase):
+    id: int
+    empresa_id: int
+    lucro_liquido_anual: Optional[float]
+    lpa_estimada: Optional[float]
+    dividendo_projetado_calc: Optional[float]
+    preco_teto: Optional[float]
+    margem: Optional[float]
+    class Config:
+        from_attributes = True
+
+class ResumoEmpresa(BaseModel):
+    empresa: str
+    ticker: str
+    ano: int
+    preco_teto: float
+    preco_atual: float
+    margem: float
+    recomendacao: str
+--------------------------------------------------------------------------------------------------------------
+
+
+
+# ----------------------------
+# dividendos_api/app/crud.py
+# ----------------------------
+from sqlalchemy.orm import Session
+from . import models, schemas
+import os
+
+def calcular_projecoes(dado: schemas.DadoFinanceiroCreate, numero_acoes: int):
+    YIELD_MINIMO = float(os.getenv("YIELD_MINIMO", 0.08))
+
+    lucro_anual = dado.lucro_t1 + dado.lucro_t2 + dado.lucro_t3 + dado.lucro_t4
+    lpa_anterior = lucro_anual / numero_acoes
+    cagr = dado.cagr if dado.cagr else 0
+    lpa_estimada = lpa_anterior * (1 + cagr)
+
+    dividendo_proj = lpa_estimada * dado.payout_projetado * dado.ajuste_dividendo
+    preco_teto = dividendo_proj / YIELD_MINIMO if YIELD_MINIMO > 0 else 0
+    margem = (preco_teto - dado.preco_atual) / dado.preco_atual if dado.preco_atual else 0
+
+    return {
+        "lucro_liquido_anual": lucro_anual,
+        "lpa_estimada": lpa_estimada,
+        "dividendo_projetado_calc": dividendo_proj,
+        "preco_teto": preco_teto,
+        "margem": margem
+    }
+
+def criar_empresa(db: Session, empresa: schemas.EmpresaCreate):
+    db_empresa = models.Empresa(**empresa.dict())
+    db.add(db_empresa)
+    db.commit()
+    db.refresh(db_empresa)
+    return db_empresa
+
+def listar_empresas(db: Session):
+    return db.query(models.Empresa).all()
+
+def criar_dado_financeiro(db: Session, dado: schemas.DadoFinanceiroCreate):
+    empresa = db.query(models.Empresa).filter(models.Empresa.id == dado.empresa_id).first()
+    calculos = calcular_projecoes(dado, empresa.numero_acoes)
+
+    db_dado = models.DadoFinanceiro(**dado.dict(), **calculos)
+    db.add(db_dado)
+    db.commit()
+    db.refresh(db_dado)
+    return db_dado
+
+def listar_dados_por_empresa(db: Session, empresa_id: int):
+    return db.query(models.DadoFinanceiro).filter(models.DadoFinanceiro.empresa_id == empresa_id).all()
+
+def obter_resumo_empresa(db: Session, empresa_id: int):
+    empresa = db.query(models.Empresa).filter(models.Empresa.id == empresa_id).first()
+    dado = db.query(models.DadoFinanceiro).filter(models.DadoFinanceiro.empresa_id == empresa_id).order_by(models.DadoFinanceiro.ano.desc()).first()
+    if not empresa or not dado:
+        return None
+    recomendacao = "Comprar" if dado.margem > 0 else "Não Comprar"
+    return {
+        "empresa": empresa.nome,
+        "ticker": empresa.ticker,
+        "ano": dado.ano,
+        "preco_teto": dado.preco_teto,
+        "preco_atual": dado.preco_atual,
+        "margem": dado.margem,
+        "recomendacao": recomendacao
+    }
+def atualizar_empresa(db: Session, empresa_id: int, empresa: schemas.EmpresaCreate):
+    empresa_existente = db.query(models.Empresa).filter(models.Empresa.id == empresa_id).first()
+    if not empresa_existente:
+        return None
+
+    empresa_existente.nome = empresa.nome
+    empresa_existente.ticker = empresa.ticker
+    empresa_existente.numero_acoes = empresa.numero_acoes
+    db.commit()
+    db.refresh(empresa_existente)
+    return empresa_existente
+
+def excluir_empresa(db: Session, empresa_id: int):
+    empresa = db.query(models.Empresa).filter(models.Empresa.id == empresa_id).first()
+    if not empresa:
+        return False
+
+    db.delete(empresa)
+    db.commit()
+    return True
+
+--------------------------------------------------------------------------------------------------------------
+
+
+# ----------------------------
+# dividendos_api/app/routers/empresas.py
+# ----------------------------
+# ----------------------------
+# routers/empresas.py
+# ----------------------------
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from sqlalchemy.orm import Session
+from app import schemas, crud, models
+from app.database import SessionLocal
+import csv
+import io
+
+router = APIRouter()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+@router.post("/", response_model=schemas.EmpresaOut)
+def criar_empresa(empresa: schemas.EmpresaCreate, db: Session = Depends(get_db)):
+    return crud.criar_empresa(db, empresa)
+
+@router.get("/", response_model=list[schemas.EmpresaOut])
+def listar_empresas(db: Session = Depends(get_db)):
+    return crud.listar_empresas(db)
+
+@router.post("/dados", response_model=schemas.DadoFinanceiroOut)
+def criar_dado_financeiro(dado: schemas.DadoFinanceiroCreate, db: Session = Depends(get_db)):
+    return crud.criar_dado_financeiro(db, dado)
+
+@router.get("/{empresa_id}/dados", response_model=list[schemas.DadoFinanceiroOut])
+def listar_dados(empresa_id: int, db: Session = Depends(get_db)):
+    return crud.listar_dados_por_empresa(db, empresa_id)
+
+@router.get("/{empresa_id}/resumo", response_model=schemas.ResumoEmpresa)
+def obter_resumo(empresa_id: int, db: Session = Depends(get_db)):
+    resumo = crud.obter_resumo_empresa(db, empresa_id)
+    if not resumo:
+        raise HTTPException(status_code=404, detail="Empresa ou dados não encontrados")
+    return resumo
+
+@router.get("/{empresa_id}/detalhes")
+def obter_detalhes_completos(empresa_id: int, db: Session = Depends(get_db)):
+    empresa = db.query(models.Empresa).filter_by(id=empresa_id).first()
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa não encontrada")
+
+    dados_financeiros = db.query(models.DadoFinanceiro).filter_by(empresa_id=empresa.id).all()
+
+    return {
+        "empresa": {
+            "id": empresa.id,
+            "nome": empresa.nome,
+            "ticker": empresa.ticker,
+            "numero_acoes": empresa.numero_acoes
+        },
+        "dados_financeiros": dados_financeiros
+    }
+
+
+
+@router.put("/{empresa_id}", response_model=schemas.EmpresaOut)
+def atualizar_empresa(empresa_id: int, empresa: schemas.EmpresaUpdate, db: Session = Depends(get_db)):
+    empresa_atualizada = crud.atualizar_empresa(db, empresa_id, empresa)
+    if not empresa_atualizada:
+        raise HTTPException(status_code=404, detail="Empresa não encontrada")
+    return empresa_atualizada
+
+@router.delete("/{empresa_id}")
+def excluir_empresa(empresa_id: int, db: Session = Depends(get_db)):
+    sucesso = crud.excluir_empresa(db, empresa_id)
+    if not sucesso:
+        raise HTTPException(status_code=404, detail="Empresa não encontrada")
+    return {"detail": "Empresa excluída com sucesso"}
+
+
+@router.post("/importar_csv")
+def importar_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    content = file.file.read().decode("utf-8")
+    reader = csv.DictReader(io.StringIO(content))
+    importados, atualizados, erros = 0, 0, []
+
+    def parse_float(value):
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return 0.0
+
+    def parse_int(value):
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return 0
+
+    for row in reader:
+        try:
+            ticker = row["ticker"]
+            ano = parse_int(row.get("ano"))
+
+            # Verifica ou cria empresa
+            empresa = db.query(models.Empresa).filter_by(ticker=ticker).first()
+            if not empresa:
+                empresa = models.Empresa(
+                    nome=ticker,
+                    ticker=ticker,
+                    numero_acoes=parse_int(row.get("numero_acoes"))
+                )
+                db.add(empresa)
+                db.commit()
+                db.refresh(empresa)
+
+            # Dados para criação ou atualização
+            dado_data = schemas.DadoFinanceiroCreate(
+                ano=ano,
+                lucro_t1=parse_float(row.get("lucro_t1")),
+                lucro_t2=parse_float(row.get("lucro_t2")),
+                lucro_t3=parse_float(row.get("lucro_t3")),
+                lucro_t4=parse_float(row.get("lucro_t4")),
+                dividendo_por_acao=parse_float(row.get("dividendo_por_acao")),
+                payout_projetado=parse_float(row.get("payout_projetado")),
+                ajuste_dividendo=parse_float(row.get("ajuste_dividendo")),
+                preco_atual=parse_float(row.get("preco_atual")),
+                cagr=parse_float(row.get("cagr")),
+                tipo_analise=row.get("tipo_analise"),
+                ajuste_motivo=row.get("ajuste_motivo"),
+                vantagens=row.get("vantagens"),
+                desvantagens=row.get("desvantagens"),
+                empresa_id=empresa.id
+            )
+
+            # Verifica se já existe
+            dado_existente = db.query(models.DadoFinanceiro).filter_by(
+                empresa_id=empresa.id,
+                ano=ano
+            ).first()
+
+            if dado_existente:
+                for field, value in dado_data.dict().items():
+                    setattr(dado_existente, field, value)
+                calculos = crud.calcular_projecoes(dado_data, empresa.numero_acoes)
+                for key, val in calculos.items():
+                    setattr(dado_existente, key, val)
+                atualizados += 1
+            else:
+                db_dado = models.DadoFinanceiro(**dado_data.dict(), **crud.calcular_projecoes(dado_data, empresa.numero_acoes))
+                db.add(db_dado)
+                importados += 1
+
+            db.commit()
+
+        except Exception as e:
+            print(f"⚠️ Erro ao importar linha: {row}")
+            print(f"Motivo: {e}")
+            erros.append({"linha": row, "erro": str(e)})
+            db.rollback()
+
+    return {
+        "importados": importados,
+        "atualizados": atualizados,
+        "falhas": len(erros),
+        "erros": erros
+    }
+
+
+
+
+--------------------------------------------------------------------------------------------------------------
+
+
+# ----------------------------
+# dividendos_api/alembic/env.py
+# ----------------------------
+
+from logging.config import fileConfig
+import os
+from dotenv import load_dotenv
+
+
+from sqlalchemy import engine_from_config
+from sqlalchemy import pool
+
+from alembic import context
+from app.database import Base
+
+
+load_dotenv()
+from app.models import Empresa, DadoFinanceiro
+
+
+# this is the Alembic Config object, which provides
+# access to the values within the .ini file in use.
+config = context.config
+
+# Interpret the config file for Python logging.
+# This line sets up loggers basically.
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+# add your model's MetaData object here
+# for 'autogenerate' support
+# from myapp import mymodel
+# target_metadata = mymodel.Base.metadata
+#target_metadata = None
+
+target_metadata = Base.metadata
+
+# other values from the config, defined by the needs of env.py,
+# can be acquired:
+# my_important_option = config.get_main_option("my_important_option")
+# ... etc.
+
+
+def run_migrations_offline() -> None:
+    """Run migrations in 'offline' mode.
+
+    This configures the context with just a URL
+    and not an Engine, though an Engine is acceptable
+    here as well.  By skipping the Engine creation
+    we don't even need a DBAPI to be available.
+
+    Calls to context.execute() here emit the given string to the
+    script output.
+
+    """
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online() -> None:
+    """Run migrations in 'online' mode.
+
+    In this scenario we need to create an Engine
+    and associate a connection with the context.
+
+    """
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection, target_metadata=target_metadata
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
+
+
+--------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
+
+
+# ----------------------------
+# dividendos_api/main.py
+# ----------------------------
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.routers import empresas
+from dotenv import load_dotenv
+import os
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # ajuste para os domínios corretos em produção
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+load_dotenv()
+
+app = FastAPI(title="Sistema de Preço Teto - Dividendos")
+
+app.include_router(empresas.router, prefix="/empresas", tags=["Empresas"])
+
+@app.get("/")
+def read_root():
+    return {"status": "OK"}
+
+
+
+
+--------------------------------------------------------------------------------------------------------------
+
+
+# ----------------------------
+# dividendos_api/.env
+# ----------------------------
+DATABASE_URL=postgresql://igghy86:soOHGynFQIS5L33kGDeNDyw@localhost:5432/dividendos
+YIELD_MINIMO=0.08
+
+--------------------------------------------------------------------------------------------------------------
+
+# ----------------------------
+# dividendos_api/alembic.ini
+# ----------------------------
+# A generic, single database configuration.
+
+[alembic]
+# path to migration scripts.
+# this is typically a path given in POSIX (e.g. forward slashes)
+# format, relative to the token %(here)s which refers to the location of this
+# ini file
+script_location = %(here)s/alembic
+
+# template used to generate migration file names; The default value is %%(rev)s_%%(slug)s
+# Uncomment the line below if you want the files to be prepended with date and time
+# see https://alembic.sqlalchemy.org/en/latest/tutorial.html#editing-the-ini-file
+# for all available tokens
+# file_template = %%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s
+
+# sys.path path, will be prepended to sys.path if present.
+# defaults to the current working directory.  for multiple paths, the path separator
+# is defined by "path_separator" below.
+prepend_sys_path = .
+
+
+# timezone to use when rendering the date within the migration file
+# as well as the filename.
+# If specified, requires the python>=3.9 or backports.zoneinfo library and tzdata library.
+# Any required deps can installed by adding `alembic[tz]` to the pip requirements
+# string value is passed to ZoneInfo()
+# leave blank for localtime
+# timezone =
+
+# max length of characters to apply to the "slug" field
+# truncate_slug_length = 40
+
+# set to 'true' to run the environment during
+# the 'revision' command, regardless of autogenerate
+# revision_environment = false
+
+# set to 'true' to allow .pyc and .pyo files without
+# a source .py file to be detected as revisions in the
+# versions/ directory
+# sourceless = false
+
+# version location specification; This defaults
+# to <script_location>/versions.  When using multiple version
+# directories, initial revisions must be specified with --version-path.
+# The path separator used here should be the separator specified by "path_separator"
+# below.
+# version_locations = %(here)s/bar:%(here)s/bat:%(here)s/alembic/versions
+
+# path_separator; This indicates what character is used to split lists of file
+# paths, including version_locations and prepend_sys_path within configparser
+# files such as alembic.ini.
+# The default rendered in new alembic.ini files is "os", which uses os.pathsep
+# to provide os-dependent path splitting.
+#
+# Note that in order to support legacy alembic.ini files, this default does NOT
+# take place if path_separator is not present in alembic.ini.  If this
+# option is omitted entirely, fallback logic is as follows:
+#
+# 1. Parsing of the version_locations option falls back to using the legacy
+#    "version_path_separator" key, which if absent then falls back to the legacy
+#    behavior of splitting on spaces and/or commas.
+# 2. Parsing of the prepend_sys_path option falls back to the legacy
+#    behavior of splitting on spaces, commas, or colons.
+#
+# Valid values for path_separator are:
+#
+# path_separator = :
+# path_separator = ;
+# path_separator = space
+# path_separator = newline
+#
+# Use os.pathsep. Default configuration used for new projects.
+path_separator = os
+
+# set to 'true' to search source files recursively
+# in each "version_locations" directory
+# new in Alembic version 1.10
+# recursive_version_locations = false
+
+# the output encoding used when revision files
+# are written from script.py.mako
+# output_encoding = utf-8
+
+# database URL.  This is consumed by the user-maintained env.py script only.
+# other means of configuring database URLs may be customized within the env.py
+# file.
+#sqlalchemy.url = driver://user:pass@localhost/dbname
+sqlalchemy.url = postgresql://igghy86:soOHGynFQIS5L33kGDeNDyw@localhost:5432/dividendos
+
+
+[post_write_hooks]
+# post_write_hooks defines scripts or Python functions that are run
+# on newly generated revision scripts.  See the documentation for further
+# detail and examples
+
+# format using "black" - use the console_scripts runner, against the "black" entrypoint
+# hooks = black
+# black.type = console_scripts
+# black.entrypoint = black
+# black.options = -l 79 REVISION_SCRIPT_FILENAME
+
+# lint with attempts to fix using "ruff" - use the module runner, against the "ruff" module
+# hooks = ruff
+# ruff.type = module
+# ruff.module = ruff
+# ruff.options = check --fix REVISION_SCRIPT_FILENAME
+
+# Alternatively, use the exec runner to execute a binary found on your PATH
+# hooks = ruff
+# ruff.type = exec
+# ruff.executable = ruff
+# ruff.options = check --fix REVISION_SCRIPT_FILENAME
+
+# Logging configuration.  This is also consumed by the user-maintained
+# env.py script only.
+[loggers]
+keys = root,sqlalchemy,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARNING
+handlers = console
+qualname =
+
+[logger_sqlalchemy]
+level = WARNING
+handlers =
+qualname = sqlalchemy.engine
+
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(levelname)-5.5s [%(name)s] %(message)s
+datefmt = %H:%M:%S
+
+--------------------------------------------------------------------------------------------------------------
+
+# ----------------------------
+# dividendos_api/requirements.txt
+# ----------------------------
+
+alembic==1.16.4
+annotated-types==0.7.0
+anyio==4.9.0
+click==8.2.1
+colorama==0.4.6
+fastapi==0.116.1
+greenlet==3.2.3
+h11==0.16.0
+idna==3.10
+Mako==1.3.10
+MarkupSafe==3.0.2
+psycopg2-binary==2.9.10
+pydantic==2.11.7
+pydantic_core==2.33.2
+python-dotenv==1.1.1
+sniffio==1.3.1
+SQLAlchemy==2.0.41
+starlette==0.47.2
+typing-inspection==0.4.1
+typing_extensions==4.14.1
+uvicorn==0.35.0
+

@@ -1,0 +1,120 @@
+//frontend/src/pages/ImportadorCSV.tsx
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
+export default function ImportadorCSV() {
+  const [file, setFile] = useState<File | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [resumo, setResumo] = useState<any>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch("http://localhost:8000/empresas/importar_csv", {
+        method: "POST",
+        body: formData,
+      });
+
+      const isJson = response.headers.get("content-type")?.includes("application/json");
+      const data = isJson ? await response.json() : { erro: await response.text() };
+
+      if (!response.ok) {
+        throw new Error(data.erro || "Erro desconhecido");
+      }
+
+      setResumo(data);
+      setStatus("✅ Importação concluída com sucesso.");
+
+    } catch (err) {
+      console.error(err);
+      setStatus("❌ Erro ao importar o arquivo CSV.");
+      setResumo(null);
+    }
+  };
+
+  return (
+    <div className="max-w-xl mx-auto p-4">
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <h2 className="text-xl font-semibold">Importar Dados Financeiros (CSV)</h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <input
+              type="file"
+              accept=".csv"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              className="block w-full"
+              required
+            />
+            <Button type="submit" disabled={!file}>
+              Enviar CSV
+            </Button>
+          </form>
+
+          {status && <p className="text-sm text-muted-foreground">{status}</p>}
+
+          {resumo && (
+            <div className="mt-4 text-sm space-y-1">
+              <p><strong>Importados:</strong> {resumo.importados}</p>
+              <p><strong>Atualizados:</strong> {resumo.atualizados}</p>
+              <p><strong>Falhas:</strong> {resumo.falhas}</p>
+
+              {resumo.erros?.length > 0 && (
+                <details className="mt-2 bg-red-50 p-2 rounded border text-red-800">
+                  <summary className="cursor-pointer">🔍 Ver detalhes dos erros</summary>
+                  <ul className="text-xs mt-2 space-y-1 max-h-48 overflow-y-auto">
+                    {resumo.erros.map((err: any, idx: number) => (
+                      <li key={idx}>
+                        <code>{JSON.stringify(err.linha)}</code><br />
+                        Erro: {err.erro}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+
+
+------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------
+
+
+//frontend/src/App.tsx
+import ImportadorCSV from "./pages/ImportadorCSV";
+
+function App() {
+  return (
+    <main className="min-h-screen bg-gray-50 p-6">
+      <ImportadorCSV />
+    </main>
+  );
+}
+
+export default App;
+
+
+
+
+//frontend/src/main.tsx
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.tsx'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+

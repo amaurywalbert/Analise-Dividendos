@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Cadastro de Empresa</title>
+</head>
+<body>
+  <h2>Cadastrar nova empresa</h2>
+  <form id="empresaForm">
+    <label>Nome: <input type="text" name="nome" required></label><br><br>
+    <label>Ticker: <input type="text" name="ticker" required></label><br><br>
+    <label>Nº de Ações: <input type="number" name="numero_acoes" required></label><br><br>
+    <button type="submit">Enviar para API</button>
+  </form>
+
+  <script>
+    document.getElementById("empresaForm").addEventListener("submit", function(event) {
+      event.preventDefault(); // Evita reload da página
+
+      const form = event.target;
+      const dados = {
+        nome: form.nome.value,
+        ticker: form.ticker.value,
+        numero_acoes: parseInt(form.numero_acoes.value)
+      };
+
+      fetch("http://localhost:8000/empresas", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(dados)
+      })
+      .then(response => response.json())
+      .then(data => {
+        alert("Empresa cadastrada com sucesso:\n" + JSON.stringify(data, null, 2));
+        form.reset();
+      })
+      .catch(error => {
+        console.error("Erro:", error);
+        alert("Erro ao cadastrar: " + error.message);
+      });
+    });
+  </script>
+</body>
+</html>
