@@ -3,17 +3,6 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-  BarChart,
-  Bar,
-} from "recharts";
 import EditarEmpresaModal from "../components/EditarEmpresaModal";
 import Dashboard from "../components/Dashboard";
 

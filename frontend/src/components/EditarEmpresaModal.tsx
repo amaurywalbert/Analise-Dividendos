@@ -7,7 +7,6 @@ export default function EditarEmpresaModal({ empresa, onClose, onSave }: any) {
   const [novoAno, setNovoAno] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [anosDisponiveis, setAnosDisponiveis] = useState<number[]>([]);
-  const ultimoAnoSalvo = anosDisponiveis.length > 0 ? Math.max(...anosDisponiveis) : null;
 
 
   // Função para lidar com mudanças nos campos do formulário
@@ -45,17 +44,23 @@ export default function EditarEmpresaModal({ empresa, onClose, onSave }: any) {
           numero_acoes: payload.numero_acoes,
         });
       }
+      
+      const anoValido = Number(form.ano);
+      if (!anoValido || isNaN(anoValido)) {
+        console.warn("Ano inválido, não foi possível salvar os dados financeiros.");
+        return;
+      }
 
-      if (!anosDisponiveis.includes(Number(form.ano))) {
+      if (!anosDisponiveis.includes(anoValido)) {
         // Criação de novo dado
         await axios.post(`http://localhost:8000/empresas/dados`, payload);
 
         // Adiciona novo ano à lista para habilitar autosave futuro como PUT
-        setAnosDisponiveis((prev) => [...prev, Number(form.ano)]);
+        setAnosDisponiveis((prev) => [...prev, anoValido]);
       } else {
         // Atualização de dado existente
         await axios.put(
-          `http://localhost:8000/empresas/${empresa.id}/dados/${form.ano}`,
+          `http://localhost:8000/empresas/${empresa.id}/dados/${anoValido}`,
           payload
         );
       }
@@ -167,7 +172,8 @@ export default function EditarEmpresaModal({ empresa, onClose, onSave }: any) {
         const res = await axios.get(`http://localhost:8000/empresas/${empresa.id}/dados`);
         const dados = res.data || [];
         const anos = dados.map((d: any) => d.ano);
-        setAnosDisponiveis([...new Set(anos)].sort((a, b) => b - a));
+        const anosUnicos = Array.from(new Set(anos)) as number[];
+        setAnosDisponiveis(anosUnicos.sort((a, b) => b - a));
 
         if (dados.length > 0) {
           const dadosOrdenados = [...dados].sort((a, b) => b.ano - a.ano);
@@ -275,7 +281,6 @@ export default function EditarEmpresaModal({ empresa, onClose, onSave }: any) {
                     <option
                       key={ano}
                       value={ano}
-                      /*className={ano === ultimoAnoSalvo ? "bg-green-100 font-semibold" : ""}*/
                     >
                       {ano}
                     </option>

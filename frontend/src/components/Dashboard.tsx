@@ -1,10 +1,10 @@
-import React from "react";
 import TabelaFinanceira from "./TabelaFinanceira";
 import GraficoPrecoTeto from "./GraficoPrecoTeto";
 import GraficoDividendos from "./GraficoDividendos";
 import GraficoCrescimento from "./GraficoCrescimento";
 
 export default function Dashboard({ empresa, dados }) {
+
   const dadosOrdenados = [...dados].sort((a, b) => a.ano - b.ano);
 
   return (
