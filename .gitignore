@@ -8,6 +8,10 @@ __pycache__/
 # Node.js
 node_modules/
 dist/
+build/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
 
 # Dados
 *.csv
