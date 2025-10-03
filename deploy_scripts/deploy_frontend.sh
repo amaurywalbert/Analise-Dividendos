@@ -29,6 +29,7 @@ fi
 
 # Atualizar npm para a versão mais recente
 echo "Atualizando npm..."
+sudo apt install npm -y
 sudo npm install -g npm@latest
 
 # Verificar se o Nginx está instalado
