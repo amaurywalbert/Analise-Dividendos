@@ -48,6 +48,10 @@ fi
 # Navegar para o diretório do frontend
 cd "$FRONTEND_DIR"
 
+# Remover a dependência problemática do package.json
+echo "Removendo dependência 'ui: github:shadcn/ui' do package.json..."
+sed -i "/\"ui\": \"github:shadcn\/ui\"/d" package.json
+
 # Instalar dependências do Node.js com mais memória
 echo "Instalando dependências do Node.js..."
 export NODE_OPTIONS="--max-old-space-size=1024"

@@ -27,10 +27,6 @@ if ! command_exists node || ! node -v | grep -q "v20"; then
     sudo apt-get install -y nodejs
 fi
 
-# Atualizar npm para a versão mais recente
-echo "Atualizando npm..."
-sudo npm install -g npm@latest
-
 # Verificar se o Nginx está instalado
 if ! command_exists nginx; then
     echo "Instalando Nginx..."
