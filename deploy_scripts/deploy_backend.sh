@@ -63,6 +63,7 @@ echo "Instalando dependências..."
 $VENV_PIP install --upgrade pip
 $VENV_PIP install -r requirements.txt
 $VENV_PIP install gunicorn
+$VENV_PIP install aiosqlite
 
 # Criar arquivo .env se não existir
 if [ ! -f ".env" ]; then
