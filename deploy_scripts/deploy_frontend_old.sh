@@ -65,21 +65,20 @@ fi
 cd "$FRONTEND_DIR"
 
 # Remover a dependência problemática do package.json
-#echo "Removendo dependência 'ui: github:shadcn/ui' do package.json..."
-#sed -i '/"ui": "github:shadcn\/ui"/d' package.json
+echo "Removendo dependência 'ui: github:shadcn/ui' do package.json..."
+sed -i '/"ui": "github:shadcn\/ui"/d' package.json
 
-# --- Correções para erros de TypeScript ---
+# --- Correções para erros de TypeScript --- 
 
 # 1. Modificar vite.config.ts para resolver __dirname e path
 echo "Corrigindo vite.config.ts para resolver problemas de path..."
-sed -i 's/import path from "path";/import { fileURLToPath } from "url";\nimport { dirname } from "path";\nimport * as path from "path";/' vite.config.ts
+sed -i 's/import path from "path";/import { fileURLToPath } from "url";\nimport { dirname } from "path";/' vite.config.ts
 sed -i 's/"@": path.resolve(__dirname, "src")/"@": path.resolve(dirname(fileURLToPath(import.meta.url)), "src")/' vite.config.ts
 
-# 2. Modificar tsconfig.json para relaxar regras de tipagem e configurar baseUrl
-echo "Ajustando tsconfig.json para relaxar regras de tipagem e configurar baseUrl..."
+# 2. Modificar tsconfig.json para relaxar regras de tipagem (temporariamente)
+echo "Ajustando tsconfig.json para relaxar regras de tipagem..."
 # Adiciona "skipLibCheck": true e "noImplicitAny": false para relaxar a verificação de tipos
-# E adiciona "baseUrl": "." para resolver os aliases de caminho
-sed -i '/"compilerOptions": {/a \    "skipLibCheck": true,\n    "noImplicitAny": false,\n    "baseUrl": ".",' tsconfig.json
+sed -i '/"compilerOptions": {/a \    "skipLibCheck": true,\n    "noImplicitAny": false,' tsconfig.json
 
 # Instalar dependências do Node.js com mais memória
 echo "Instalando dependências do Node.js..."
