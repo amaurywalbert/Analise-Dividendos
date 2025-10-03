@@ -48,7 +48,7 @@ fi
 cd "$BACKEND_DIR"
 
 # Criar ambiente virtual se não existir
-if [ ! -d "venv" ]; then
+if [ ! -d "venv/bin" ]; then
     echo "Criando ambiente virtual..."
     python3 -m venv venv
 fi
