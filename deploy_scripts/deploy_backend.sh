@@ -62,6 +62,7 @@ VENV_ALEMBIC="$BACKEND_DIR/venv/bin/alembic"
 echo "Instalando dependências..."
 $VENV_PIP install --upgrade pip
 $VENV_PIP install -r requirements.txt
+$VENV_PIP install gunicorn
 
 # Criar arquivo .env se não existir
 if [ ! -f ".env" ]; then
