@@ -82,7 +82,7 @@ echo "Criando script de inicialização do Gunicorn..."
 cat > gunicorn_start.sh << EOF
 #!/bin/bash
 
-NAME="$SERVICE_NAME"
+NAME="analise_dividendos_backend"
 DIR="$BACKEND_DIR"
 VENV="$BACKEND_DIR/venv"
 SOCKFILE="$BACKEND_DIR/gunicorn.sock"
@@ -96,11 +96,11 @@ echo "Starting $NAME as `whoami`"
 cd "$DIR"
 
 # Executar Gunicorn usando o python do ambiente virtual
-exec "$VENV/bin/gunicorn" main:app \
-  --name "$NAME" \
-  --workers "$NUM_WORKERS" \
-  --user="$USER" --group="$GROUP" \
-  --bind=unix:"$SOCKFILE" \
+exec "/home/ubuntu/Analise-Dividendos/backend/venv/bin/gunicorn" main:app \
+  --name "analise_dividendos_backend" \
+  --workers "1" \
+  --user="ubuntu" --group="ubuntu" \
+  --bind=unix:"/home/ubuntu/Analise-Dividendos/backend/gunicorn.sock" \
   --log-level=info \
   --log-file=-
 EOF
