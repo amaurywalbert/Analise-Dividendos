@@ -20,6 +20,11 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+echo "Removendo instalações anteriores de Node.js e npm..."
+sudo apt remove --purge -y nodejs npm
+sudo apt autoremove -y
+sudo rm -rf /usr/local/{lib/node{,/.npm},bin,share/man}/npm*
+
 # Verificar se o Node.js está instalado e na versão correta
 if ! command_exists node || ! node -v | grep -q "v20"; then
     echo "Instalando Node.js v20..."
@@ -29,8 +34,11 @@ fi
 
 # Atualizar npm para a versão mais recente
 echo "Atualizando npm..."
-sudo apt install npm -y
 sudo npm install -g npm@latest
+
+# Verificar versões instaladas
+echo "Versão do Node.js instalada: $(node -v)"
+echo "Versão do npm instalada: $(npm -v)"
 
 # Verificar se o Nginx está instalado
 if ! command_exists nginx; then
