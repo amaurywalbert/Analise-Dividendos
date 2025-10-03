@@ -72,14 +72,14 @@ cd "$FRONTEND_DIR"
 
 # 1. Modificar vite.config.ts para resolver __dirname e path
 echo "Corrigindo vite.config.ts para resolver problemas de path..."
-sed -i 's/import path from "path";/import { fileURLToPath } from "url";\nimport { dirname } from "path";\nimport * as path from "path";/' vite.config.ts
-sed -i 's/"@": path.resolve(__dirname, "src")/"@": path.resolve(dirname(fileURLToPath(import.meta.url)), "src")/' vite.config.ts
+sed -i 's/import path from "path";/import { fileURLToPath } from "url";\nimport * as path from "path";\nconst __filename = fileURLToPath(import.meta.url);\nconst __dirname = path.dirname(__filename);/' vite.config.ts
+sed -i 's/"@": path.resolve(__dirname, "src")/"@": path.resolve(__dirname, "src")/' vite.config.ts
 
 # 2. Modificar tsconfig.json para relaxar regras de tipagem e configurar baseUrl
 echo "Ajustando tsconfig.json para relaxar regras de tipagem e configurar baseUrl..."
 # Adiciona "skipLibCheck": true e "noImplicitAny": false para relaxar a verificação de tipos
 # E adiciona "baseUrl": "." para resolver os aliases de caminho
-sed -i '/"compilerOptions": {/a \    "skipLibCheck": true,\n    "noImplicitAny": false,\n    "baseUrl": ".",' tsconfig.json
+sed -i '/"compilerOptions": {/a \    "skipLibCheck": true,\n    "noImplicitAny": false,\n    "baseUrl": ".",\n    "paths": {\n      "@/*": ["./src/*"]\n    },' tsconfig.json
 
 # Instalar dependências do Node.js com mais memória
 echo "Instalando dependências do Node.js..."
