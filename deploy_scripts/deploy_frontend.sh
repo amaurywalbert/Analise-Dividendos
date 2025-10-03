@@ -15,15 +15,25 @@ DEPLOY_DIR="/home/ubuntu/Analise-Dividendos"
 FRONTEND_DIR="$DEPLOY_DIR/frontend"
 NGINX_SITE_NAME="analise_dividendos"
 
+#!/bin/bash
+
 # Função para verificar se um comando existe
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-echo "Removendo instalações anteriores de Node.js e npm..."
-sudo apt remove --purge -y nodejs npm
-sudo apt autoremove -y
-sudo rm -rf /usr/local/{lib/node{,/.npm},bin,share/man}/npm*
+#echo "🔧 Removendo instalações anteriores de Node.js e npm..."
+#sudo apt remove --purge -y nodejs npm
+#sudo apt autoremove -y
+
+#echo "🧹 Limpando diretórios residuais..."
+#sudo rm -rf /usr/lib/node_modules/npm
+#sudo rm -rf /usr/lib/node_modules/.npm-*
+#sudo rm -rf /usr/local/lib/node_modules
+#sudo rm -rf /usr/local/bin/npm
+#sudo rm -rf /usr/local/bin/node
+#sudo rm -rf ~/.npm
+#sudo rm -rf ~/.nvm
 
 # Verificar se o Node.js está instalado e na versão correta
 if ! command_exists node || ! node -v | grep -q "v20"; then
@@ -36,9 +46,10 @@ fi
 echo "Atualizando npm..."
 sudo npm install -g npm@latest
 
-# Verificar versões instaladas
-echo "Versão do Node.js instalada: $(node -v)"
-echo "Versão do npm instalada: $(npm -v)"
+echo "✅ Versões instaladas:"
+echo "Node.js: $(node -v)"
+echo "npm: $(npm -v)"
+
 
 # Verificar se o Nginx está instalado
 if ! command_exists nginx; then
